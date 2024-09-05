@@ -7,8 +7,7 @@ frappe.ui.form.on('PC Expense Type', {
 			var d = locals[cdt][cdn];
 			return {
 				filters: {
-					"is_group": 0,
-					// "root_type": frm.doc.deferred_expense_account ? "Asset" : "Expense",
+					"is_group": 0,				
 					'company': d.company
 				}
 			}
