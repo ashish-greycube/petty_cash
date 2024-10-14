@@ -79,7 +79,7 @@ app_license = "MIT"
 
 # before_app_install = "petty_cash.utils.before_app_install"
 # after_app_install = "petty_cash.utils.after_app_install"
-after_migrate = "gi.petty_cash.after_migrate"
+after_migrate = "petty_cash.migrate.after_migrate"
 # Integration Cleanup
 # -------------------
 # To clean up dependencies/integrations with other apps
