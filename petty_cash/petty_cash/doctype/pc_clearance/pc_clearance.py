@@ -64,7 +64,7 @@ class PCClearance(Document):
 
 	def check_attachment_present_for_stock_items(self):
 		print(self.is_new(),'self.is_new()')
-		if not self.is_new():
+		if not self.is_new() and self.get("workflow_state"):
 			old_doc = self.get_doc_before_save()
 			print('222',self.workflow_state , old_doc.workflow_state)
 			if ( old_doc.workflow_state and self.workflow_state and old_doc.workflow_state =='Pending' and self.workflow_state=='Waiting Finance Approval') :
