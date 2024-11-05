@@ -370,16 +370,16 @@ function hide_all_fields_rows_for_non_creator(frm){
 			}			
 		}
 
-		let clearances=frm.doc.clearance_details
-		for (let index = 0; index < clearances.length; index++) {
-			let created_by_user=clearances[index].created_by_user
-			console.log('created_by_user,current_user,index')
-			console.log(created_by_user,'--',current_user,index)
-			if (created_by_user && created_by_user!=current_user) {
-				console.log('hide')
-				$("[data-fieldname='clearance_details']").find("[data-idx='"+clearances[index].idx+"']").hide()
-			}
-		}
+		// let clearances=frm.doc.clearance_details
+		// for (let index = 0; index < clearances.length; index++) {
+		// 	let created_by_user=clearances[index].created_by_user
+		// 	console.log('created_by_user,current_user,index')
+		// 	console.log(created_by_user,'--',current_user,index)
+		// 	if (created_by_user && created_by_user!=current_user) {
+		// 		console.log('hide')
+		// 		$("[data-fieldname='clearance_details']").find("[data-idx='"+clearances[index].idx+"']").hide()
+		// 	}
+		// }
 		let stock_item_details=frm.doc.stock_item_details
 		for (let index = 0; index < stock_item_details.length; index++) {
 			let stock_created_by_user = stock_item_details[index].created_by_user;
