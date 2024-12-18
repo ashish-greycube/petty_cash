@@ -101,9 +101,9 @@ def update_pc_request_fields(self,method):
 			elif actual_paid_amount==0:
 				payment_status='Not Paid'
 				frappe.db.set_value('PC Request',self.custom_pc_request_reference , 'payment_status',payment_status )
-			elif actual_paid_amount>total_amount:
-				frappe.throw(_("{0} has requested total amount as {1} and total actual paid amount will become {2} <br> Total paid amount should not exceed requested amount."
-				   .format(get_link_to_form('PC Request',self.custom_pc_request_reference),frappe.bold(total_amount),frappe.bold(actual_paid_amount))))
+			# elif actual_paid_amount>total_amount:
+			# 	frappe.throw(_("{0} has requested total amount as {1} and total actual paid amount will become {2} <br> Total paid amount should not exceed requested amount."
+			# 	   .format(get_link_to_form('PC Request',self.custom_pc_request_reference),frappe.bold(total_amount),frappe.bold(actual_paid_amount))))
 
 			frappe.msgprint(
 					_("PC Request {0} is updated with acutal paid amount {1} and payment status {2}"
