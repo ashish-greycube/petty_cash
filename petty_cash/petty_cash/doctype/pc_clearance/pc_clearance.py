@@ -103,8 +103,9 @@ class PCClearance(Document):
 
 	def on_submit(self):
 		default_petty_cash_account=self.get_default_petty_cash_account()
-		self.create_je_for_non_taxable_and_non_stock_items(default_petty_cash_account)
-		self.create_je_for_taxable_and_non_stock_items(default_petty_cash_account)
+		# self.create_je_for_non_taxable_and_non_stock_items(default_petty_cash_account)
+		# self.create_je_for_taxable_and_non_stock_items(default_petty_cash_account)
+		self.create_je_for_non_taxable_and_taxable_and_non_stock_items(default_petty_cash_account)
 		self.create_pi_for_taxable_items()
 		self.reload()
 		clearance_journal_entry=self.create_consolidated_clearance_journal_entry(default_petty_cash_account)
@@ -299,7 +300,107 @@ class PCClearance(Document):
 		print('taxes',pi.taxes,pi.taxes)
 		user_remark="It is auto created on submit of PC Clearance {0}, Expense Type {1}, Row # {2}".format(self.name,expense_type,clearance_detail_row_idx)
 		pi.add_comment('Comment', text=user_remark)
-		return pi.name					
+		return pi.name			
+
+	def create_je_for_non_taxable_and_taxable_and_non_stock_items(self,default_petty_cash_account):
+		expense_type_msg=[]
+		clearance_detail_row_idx_msg=[]
+		accounts = []
+		for clearance_item in self.clearance_details:
+			# Only case, we doNOT create PI is when  is_non_stock_expense_type=1 and is_tax_applicable=0
+			if clearance_item.is_tax_applicable==1 and clearance_item.is_non_stock_expense_type==1 :
+				# expense_type = frappe.get_doc('PC Expense Type', clearance_item.expense_type)
+				# # default_non_stock_item=expense_type.default_non_stock_item
+				# for account in expense_type.accounts:
+				#   if account.company==self.company:
+				#       default_expense_account=account.default_account
+				#       break
+				expense_type=clearance_item.expense_type
+				clearance_detail_row_idx=clearance_item.idx
+				debit_account_1=self.get_default_expense_account(expense_type,self.company)
+				debit_account_2=(get_default_taxes_and_charges("Purchase Taxes and Charges Template",company=self.company)).get('taxes')[0].get("account_head")
+				if not debit_account_2:
+					frappe.throw(_("Default tax acccount not found in Purchase Taxes and Charges Template {0} company".format(self.company)))
+				print('debit_account_2',debit_account_2)
+				debit_amount_1=clearance_item.amount
+				debit_amount_2=clearance_item.amount_with_tax-clearance_item.amount
+				credit_account=default_petty_cash_account
+				expense_amount=clearance_item.amount_with_tax   
+				bill_no=clearance_item.bill_no
+				cost_center=clearance_item.cost_center
+				
+				accounts.append({
+					"account": debit_account_1,
+					"debit_in_account_currency": debit_amount_1,
+					"cost_center": cost_center
+				})
+				accounts.append({
+					"account": debit_account_2,
+					"debit_in_account_currency": debit_amount_2,
+					"cost_center": cost_center
+				})              
+				# credit entry
+				accounts.append({
+					"account": credit_account,
+					"credit_in_account_currency": expense_amount,
+					"cost_center":  cost_center,
+					"party_type":"Employee",
+					"party":self.employee
+				})
+				expense_type_msg.append(expense_type)
+				clearance_detail_row_idx_msg.append(clearance_detail_row_idx)
+				
+		for clearance_item in self.clearance_details:
+			# Only case, we doNOT create PI is when  is_non_stock_expense_type=1 and is_tax_applicable=0
+			if clearance_item.is_tax_applicable==0 and clearance_item.is_non_stock_expense_type==1 :
+				# expense_type = frappe.get_doc('PC Expense Type', clearance_item.expense_type)
+				# # default_non_stock_item=expense_type.default_non_stock_item
+				# for account in expense_type.accounts:
+				#   if account.company==self.company:
+				#       default_expense_account=account.default_account
+				#       break
+				expense_type=clearance_item.expense_type
+				clearance_detail_row_idx=clearance_item.idx
+				debit_account=self.get_default_expense_account(expense_type,self.company)
+				credit_account=default_petty_cash_account
+				expense_amount=clearance_item.amount_with_tax   
+				bill_no=clearance_item.bill_no
+				cost_center=clearance_item.cost_center
+				accounts.append({
+					"account": debit_account,
+					"debit_in_account_currency": expense_amount,
+					"cost_center": cost_center
+				})
+				# credit entry
+				accounts.append({
+					"account": credit_account,
+					"credit_in_account_currency": expense_amount,
+					"cost_center":  cost_center,
+					"party_type":"Employee",
+					"party":self.employee
+				})
+				expense_type_msg.append(expense_type)
+				clearance_detail_row_idx_msg.append(clearance_detail_row_idx)
+		expense_type_join_msg = ", ".join((ele if ele!=None else '') for ele in expense_type_msg)
+		clearance_detail_row_idx_join_msg = ", ".join((str(ele) if ele!=None else '') for ele in clearance_detail_row_idx_msg)
+		
+		user_remark="It is auto created on submit of PC Clearance {0}, Expense Type {1}, Row # {2}".format(self.name,expense_type_join_msg,clearance_detail_row_idx_join_msg)
+		print('user_remark',user_remark)
+		journal_entry = frappe.new_doc('Journal Entry')
+		journal_entry.voucher_type = 'Journal Entry'
+		journal_entry.company = self.company
+		journal_entry.user_remark =user_remark
+		journal_entry.bill_no=bill_no
+		journal_entry.posting_date =self.clearance_date
+		journal_entry.set("accounts", accounts)
+		journal_entry.custom_pc_clearance_reference=self.name
+		journal_entry.save(ignore_permissions = True)               
+		journal_entry.submit()  
+		journal_entry.add_comment('Comment', text=user_remark)
+		for item in self.clearance_details:
+			for ele in clearance_detail_row_idx_msg:
+				if item.idx==ele:
+					frappe.db.set_value("PC Clearance Detail",item.name,"pi_jv_reference",journal_entry.name)		
 
 	def create_je_for_taxable_and_non_stock_items(self,default_petty_cash_account):
 		for clearance_item in self.clearance_details:
