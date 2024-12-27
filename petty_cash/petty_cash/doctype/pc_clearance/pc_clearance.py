@@ -332,12 +332,14 @@ class PCClearance(Document):
 				accounts.append({
 					"account": debit_account_1,
 					"debit_in_account_currency": debit_amount_1,
-					"cost_center": cost_center
+					"cost_center": cost_center,
+					"user_remark":clearance_item.comments
 				})
 				accounts.append({
 					"account": debit_account_2,
 					"debit_in_account_currency": debit_amount_2,
-					"cost_center": cost_center
+					"cost_center": cost_center,
+					"user_remark":clearance_item.comments
 				})              
 				# credit entry
 				accounts.append({
@@ -345,7 +347,8 @@ class PCClearance(Document):
 					"credit_in_account_currency": expense_amount,
 					"cost_center":  cost_center,
 					"party_type":"Employee",
-					"party":self.employee
+					"party":self.employee,
+					"user_remark":clearance_item.comments
 				})
 				expense_type_msg.append(expense_type)
 				clearance_detail_row_idx_msg.append(clearance_detail_row_idx)
@@ -369,7 +372,8 @@ class PCClearance(Document):
 				accounts.append({
 					"account": debit_account,
 					"debit_in_account_currency": expense_amount,
-					"cost_center": cost_center
+					"cost_center": cost_center,
+					"user_remark":clearance_item.comments
 				})
 				# credit entry
 				accounts.append({
@@ -377,7 +381,8 @@ class PCClearance(Document):
 					"credit_in_account_currency": expense_amount,
 					"cost_center":  cost_center,
 					"party_type":"Employee",
-					"party":self.employee
+					"party":self.employee,
+					"user_remark":clearance_item.comments
 				})
 				expense_type_msg.append(expense_type)
 				clearance_detail_row_idx_msg.append(clearance_detail_row_idx)

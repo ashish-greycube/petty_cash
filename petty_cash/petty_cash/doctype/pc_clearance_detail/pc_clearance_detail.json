@@ -26,7 +26,8 @@
   "pi_jv_reference",
   "created_by_user",
   "section_break_nrqj4",
-  "add_item"
+  "add_item",
+  "comments"
  ],
  "fields": [
   {
@@ -173,12 +174,17 @@
    "label": "Created By User",
    "options": "User",
    "read_only": 1
+  },
+  {
+   "fieldname": "comments",
+   "fieldtype": "Data",
+   "label": "Comments"
   }
  ],
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2024-02-07 07:17:12.763564",
+ "modified": "2024-12-27 11:01:43.185830",
  "modified_by": "Administrator",
  "module": "Petty Cash",
  "name": "PC Clearance Detail",
