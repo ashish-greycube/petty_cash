@@ -236,7 +236,7 @@ class PCClearance(Document):
 					frappe.throw(_("Default tax acccount not found in Purchase Taxes and Charges Template {0} company".format(self.company)))
 				print('debit_account_2',debit_account_2)
 				debit_amount_1=flt(clearance_item.amount,2)
-				debit_amount_2=flt(clearance_item.amount_with_tax-clearance_item.amount,2)
+				debit_amount_2=flt(clearance_item.amount_with_tax,2)-flt(clearance_item.amount,2)
 
 				credit_account=default_petty_cash_account
 				expense_amount=flt(clearance_item.amount_with_tax,2)   
