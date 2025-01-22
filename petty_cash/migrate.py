@@ -37,6 +37,32 @@ def after_migrate():
                 is_custom_field=1,
             ),
         ],
+
+        "Purchase Invoice": [
+            dict(
+                fieldname="custom_pc_clearance_reference",
+                label="PC Clearance Reference",
+                fieldtype="Link",
+                options="PC Clearance",
+                insert_after="represents_company",
+                translatable=0,
+                is_system_generated=0,
+                is_custom_field=1,
+		    ),
+        ],
+
+        "Journal Entry": [
+            dict(
+                fieldname="custom_pc_clearance_reference",
+                label="PC Clearance Reference",
+                fieldtype="Link",
+                options="PC Clearance",
+                insert_after="inter_company_journal_entry_reference",
+                translatable=0,
+                is_system_generated=0,
+                is_custom_field=1,
+            ),
+        ],
         
     }
     print("Creating custom fields for app petty cash:")
