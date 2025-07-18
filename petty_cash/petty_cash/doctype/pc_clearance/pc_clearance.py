@@ -67,7 +67,7 @@ class PCClearance(Document):
 		if not self.is_new() and self.get("workflow_state"):
 			old_doc = self.get_doc_before_save()
 			print('222',self.workflow_state , old_doc.workflow_state)
-			if ( old_doc.workflow_state and self.workflow_state and old_doc.workflow_state =='Pending' and self.workflow_state=='Waiting Finance Approval') :
+			if ( old_doc.workflow_state and self.workflow_state and old_doc.workflow_state ==_('Pending') and self.workflow_state==_('Waiting Finance Approval')) :
 				for row_wk in self.clearance_details:
 					if row_wk.is_non_stock_expense_type==0 and not row_wk.attachment:
 						frappe.throw(
@@ -107,6 +107,7 @@ class PCClearance(Document):
 		# self.create_je_for_taxable_and_non_stock_items(default_petty_cash_account)
 		self.create_je_for_non_taxable_and_taxable_and_non_stock_items(default_petty_cash_account)
 		self.create_pi_for_taxable_items()
+		self.create_je_for_personal_loan(default_petty_cash_account)
 		self.reload()
 		clearance_journal_entry=self.create_consolidated_clearance_journal_entry(default_petty_cash_account)
 		frappe.db.set_value('PC Clearance', self.name, 'clearance_journal_entry', clearance_journal_entry)
@@ -125,7 +126,9 @@ class PCClearance(Document):
 			if max_allowed_amt_wo_tax>0 and expense_type_to_check_total_amount>max_allowed_amt_wo_tax:
 				frappe.throw(_("For expense type {0}, Max. Allowed Amount Without Tax is {1} whereas actual is {2}.".format(clearance_item.expense_type,frappe.bold(max_allowed_amt_wo_tax),frappe.bold(expense_type_to_check_total_amount))))						
 			
-			expense_type_to_check_actual_per=flt((expense_type_to_check_total_amount/self.total_expense_without_tax)*100,2)
+			expense_type_to_check_actual_per=0
+			if self.total_expense_without_tax>0:
+				expense_type_to_check_actual_per=flt((expense_type_to_check_total_amount/self.total_expense_without_tax)*100,2)
 			clearance_item.actual_percentage_of_total_for_amt_without_tax=expense_type_to_check_actual_per
 			if allowed_percent_of_total_clearance>0 and expense_type_to_check_actual_per>allowed_percent_of_total_clearance:
 				frappe.throw(_("For expense type {0}, allowed percentage of total without tax is {1} % whereas actual is {2} %.".format(clearance_item.expense_type,frappe.bold(allowed_percent_of_total_clearance),frappe.bold(expense_type_to_check_actual_per))))		
@@ -175,12 +178,18 @@ class PCClearance(Document):
 		total_petty_cash=0
 		remaining_amount=0
 		total_expense_without_tax=0
+		total_personal_loan_amount=0
 		if len(self.clearance_details)>0:
 			for clearance_item in self.clearance_details:
-				total_expense=total_expense+ (clearance_item.amount_with_tax or 0)
-				total_expense_without_tax=total_expense_without_tax+ (clearance_item.amount or 0)
+				if clearance_item.is_personal_loan==0:
+					total_expense=total_expense+ (clearance_item.amount_with_tax or 0)
+					total_expense_without_tax=total_expense_without_tax+ (clearance_item.amount or 0)
+				else:
+					# personal loan is not included in total expense
+					total_personal_loan_amount=total_personal_loan_amount+ clearance_item.amount_with_tax
 		self.total_expense_without_tax=total_expense_without_tax
 		self.total_expense=total_expense
+		self.total_personal_loan_amount=total_personal_loan_amount
 		self.total_petty_cash=self.previous_balance or 0
 		self.remaining_amount=self.total_expense-self.total_petty_cash
 
@@ -221,103 +230,106 @@ class PCClearance(Document):
 		accounts = []
 		for clearance_item in self.clearance_details:
 			# Only case, we doNOT create PI is when  is_non_stock_expense_type=1 and is_tax_applicable=0
-			if clearance_item.is_tax_applicable==1 and clearance_item.is_non_stock_expense_type==1 :
-				# expense_type = frappe.get_doc('PC Expense Type', clearance_item.expense_type)
-				# # default_non_stock_item=expense_type.default_non_stock_item
-				# for account in expense_type.accounts:
-				#   if account.company==self.company:
-				#       default_expense_account=account.default_account
-				#       break
-				expense_type=clearance_item.expense_type
-				clearance_detail_row_idx=clearance_item.idx
-				debit_account_1=self.get_default_expense_account(expense_type,self.company)
-				debit_account_2=(get_default_taxes_and_charges("Purchase Taxes and Charges Template",company=self.company)).get('taxes')[0].get("account_head")
-				if not debit_account_2:
-					frappe.throw(_("Default tax acccount not found in Purchase Taxes and Charges Template {0} company".format(self.company)))
-				print('debit_account_2',debit_account_2)
-				debit_amount_1=flt(clearance_item.amount,2)
-				debit_amount_2=flt(clearance_item.amount_with_tax,2)-flt(clearance_item.amount,2)
+			if clearance_item.is_personal_loan==0:
+				if clearance_item.is_tax_applicable==1 and clearance_item.is_non_stock_expense_type==1 :
+					# expense_type = frappe.get_doc('PC Expense Type', clearance_item.expense_type)
+					# # default_non_stock_item=expense_type.default_non_stock_item
+					# for account in expense_type.accounts:
+					#   if account.company==self.company:
+					#       default_expense_account=account.default_account
+					#       break
+					expense_type=clearance_item.expense_type
+					clearance_detail_row_idx=clearance_item.idx
+					debit_account_1=self.get_default_expense_account(expense_type,self.company)
+					debit_account_2=(get_default_taxes_and_charges("Purchase Taxes and Charges Template",company=self.company)).get('taxes')[0].get("account_head")
+					if not debit_account_2:
+						frappe.throw(_("Default tax acccount not found in Purchase Taxes and Charges Template {0} company".format(self.company)))
+					print('debit_account_2',debit_account_2)
+					debit_amount_1=flt(clearance_item.amount,2)
+					debit_amount_2=flt(clearance_item.amount_with_tax,2)-flt(clearance_item.amount,2)
 
-				credit_account=default_petty_cash_account
-				expense_amount=flt(clearance_item.amount_with_tax,2)   
-				bill_no=clearance_item.bill_no
-				cost_center=clearance_item.cost_center
-				
-				accounts.append({
-					"account": debit_account_1,
-					"debit_in_account_currency": debit_amount_1,
-					"cost_center": cost_center
-				})
-				accounts.append({
-					"account": debit_account_2,
-					"debit_in_account_currency": debit_amount_2,
-					"cost_center": cost_center
-				})              
-				# credit entry
-				accounts.append({
-					"account": credit_account,
-					"credit_in_account_currency": expense_amount,
-					"cost_center":  cost_center,
-					"party_type":"Employee",
-					"party":self.employee
-				})
-				expense_type_msg.append(expense_type)
-				clearance_detail_row_idx_msg.append(clearance_detail_row_idx)
+					credit_account=default_petty_cash_account
+					expense_amount=flt(clearance_item.amount_with_tax,2)   
+					bill_no=clearance_item.bill_no
+					cost_center=clearance_item.cost_center
+					
+					accounts.append({
+						"account": debit_account_1,
+						"debit_in_account_currency": debit_amount_1,
+						"cost_center": cost_center
+					})
+					accounts.append({
+						"account": debit_account_2,
+						"debit_in_account_currency": debit_amount_2,
+						"cost_center": cost_center
+					})              
+					# credit entry
+					accounts.append({
+						"account": credit_account,
+						"credit_in_account_currency": expense_amount,
+						"cost_center":  cost_center,
+						"party_type":"Employee",
+						"party":self.employee
+					})
+					expense_type_msg.append(expense_type)
+					clearance_detail_row_idx_msg.append(clearance_detail_row_idx)
 				
 		for clearance_item in self.clearance_details:
 			# Only case, we doNOT create PI is when  is_non_stock_expense_type=1 and is_tax_applicable=0
-			if clearance_item.is_tax_applicable==0 and clearance_item.is_non_stock_expense_type==1 :
-				# expense_type = frappe.get_doc('PC Expense Type', clearance_item.expense_type)
-				# # default_non_stock_item=expense_type.default_non_stock_item
-				# for account in expense_type.accounts:
-				#   if account.company==self.company:
-				#       default_expense_account=account.default_account
-				#       break
-				expense_type=clearance_item.expense_type
-				clearance_detail_row_idx=clearance_item.idx
-				debit_account=self.get_default_expense_account(expense_type,self.company)
-				credit_account=default_petty_cash_account
-				expense_amount=flt(clearance_item.amount_with_tax,2)   
-				bill_no=clearance_item.bill_no
-				cost_center=clearance_item.cost_center
-				accounts.append({
-					"account": debit_account,
-					"debit_in_account_currency": expense_amount,
-					"cost_center": cost_center
-				})
-				# credit entry
-				accounts.append({
-					"account": credit_account,
-					"credit_in_account_currency": expense_amount,
-					"cost_center":  cost_center,
-					"party_type":"Employee",
-					"party":self.employee
-				})
-				expense_type_msg.append(expense_type)
-				clearance_detail_row_idx_msg.append(clearance_detail_row_idx)
+			if clearance_item.is_personal_loan==0:
+				if clearance_item.is_tax_applicable==0 and clearance_item.is_non_stock_expense_type==1 :
+					# expense_type = frappe.get_doc('PC Expense Type', clearance_item.expense_type)
+					# # default_non_stock_item=expense_type.default_non_stock_item
+					# for account in expense_type.accounts:
+					#   if account.company==self.company:
+					#       default_expense_account=account.default_account
+					#       break
+					expense_type=clearance_item.expense_type
+					clearance_detail_row_idx=clearance_item.idx
+					debit_account=self.get_default_expense_account(expense_type,self.company)
+					credit_account=default_petty_cash_account
+					expense_amount=flt(clearance_item.amount_with_tax,2)   
+					bill_no=clearance_item.bill_no
+					cost_center=clearance_item.cost_center
+					accounts.append({
+						"account": debit_account,
+						"debit_in_account_currency": expense_amount,
+						"cost_center": cost_center
+					})
+					# credit entry
+					accounts.append({
+						"account": credit_account,
+						"credit_in_account_currency": expense_amount,
+						"cost_center":  cost_center,
+						"party_type":"Employee",
+						"party":self.employee
+					})
+					expense_type_msg.append(expense_type)
+					clearance_detail_row_idx_msg.append(clearance_detail_row_idx)
 
 		expense_type_join_msg = ", ".join((ele if ele!=None else '') for ele in expense_type_msg)
 		clearance_detail_row_idx_join_msg = ", ".join((str(ele) if ele!=None else '') for ele in clearance_detail_row_idx_msg)
 		
-		user_remark="It is auto created on submit of PC Clearance {0}, Expense Type {1}, Row # {2}".format(self.name,expense_type_join_msg,clearance_detail_row_idx_join_msg)
-		print('user_remark',user_remark)
-		journal_entry = frappe.new_doc('Journal Entry')
-		journal_entry.voucher_type = 'Journal Entry'
-		journal_entry.company = self.company
-		journal_entry.user_remark =user_remark
-		journal_entry.bill_no=bill_no
-		journal_entry.posting_date =self.clearance_date
-		journal_entry.set("accounts", accounts)
-		journal_entry.custom_pc_clearance_reference=self.name
-		journal_entry.save(ignore_permissions = True)               
-		journal_entry.submit()  
-		journal_entry.add_comment('Comment', text=user_remark)
+		if len(accounts)>0:
+			user_remark="It is auto created on submit of PC Clearance {0}, Expense Type {1}, Row # {2}".format(self.name,expense_type_join_msg,clearance_detail_row_idx_join_msg)
+			print('user_remark',user_remark)
+			journal_entry = frappe.new_doc('Journal Entry')
+			journal_entry.voucher_type = 'Journal Entry'
+			journal_entry.company = self.company
+			journal_entry.user_remark =user_remark
+			journal_entry.bill_no=bill_no
+			journal_entry.posting_date =self.clearance_date
+			journal_entry.set("accounts", accounts)
+			journal_entry.custom_pc_clearance_reference=self.name
+			journal_entry.save(ignore_permissions = True)               
+			journal_entry.submit()  
+			journal_entry.add_comment('Comment', text=user_remark)
 
-		for item in self.clearance_details:
-			for ele in clearance_detail_row_idx_msg:
-				if item.idx==ele:
-					print(item.idx, ele,'==================')
-					frappe.db.set_value("PC Clearance Detail",item.name,"pi_jv_reference",journal_entry.name)
+			for item in self.clearance_details:
+				for ele in clearance_detail_row_idx_msg:
+					if item.idx==ele:
+						print(item.idx, ele,'==================')
+						frappe.db.set_value("PC Clearance Detail",item.name,"pi_jv_reference",journal_entry.name)
 
 	def create_pi_for_taxable_items(self):
 		for clearance_item in self.clearance_details:
@@ -531,30 +543,31 @@ class PCClearance(Document):
 		accounts = []
 		clearance_detail_row_idx=[]
 		for clearance_item in self.clearance_details:
-			if (clearance_item.is_tax_applicable==1 and clearance_item.is_non_stock_expense_type==0) or (clearance_item.is_tax_applicable==0 and clearance_item.is_non_stock_expense_type==0):
-				clearance_detail_row_idx.append(cstr(clearance_item.idx))
-				# debit entry
-				print('clearance_item',clearance_item.name,clearance_item.idx,' clearance_item.amount_with_tax' ,clearance_item.amount_with_tax)
-				print("party",clearance_item.supplier,"party",self.employee,"daccount",debit_account,"caccount", credit_account)
-				accounts.append({
-					"account": debit_account,
-					"debit_in_account_currency": clearance_item.amount_with_tax,
-					"cost_center": default_cost_center or '',
-					"party_type":"Supplier",
-					"party":clearance_item.supplier,	
-					"reference_type":"Purchase Invoice",
-					"reference_name":clearance_item.pi_jv_reference								
-				})
-				# credit entry
-				accounts.append({
-					"account": credit_account,
-					"credit_in_account_currency": clearance_item.amount_with_tax,
-					"cost_center": default_cost_center or '',
-					"party_type":"Employee",
-					"party":self.employee,
-					# "reference_type":"Purchase Invoice",
-					# "reference_name":clearance_item.pi_jv_reference
-				})
+			if clearance_item.is_personal_loan==0:
+				if (clearance_item.is_tax_applicable==1 and clearance_item.is_non_stock_expense_type==0) or (clearance_item.is_tax_applicable==0 and clearance_item.is_non_stock_expense_type==0):
+					clearance_detail_row_idx.append(cstr(clearance_item.idx))
+					# debit entry
+					print('clearance_item',clearance_item.name,clearance_item.idx,' clearance_item.amount_with_tax' ,clearance_item.amount_with_tax)
+					print("party",clearance_item.supplier,"party",self.employee,"daccount",debit_account,"caccount", credit_account)
+					accounts.append({
+						"account": debit_account,
+						"debit_in_account_currency": clearance_item.amount_with_tax,
+						"cost_center": default_cost_center or '',
+						"party_type":"Supplier",
+						"party":clearance_item.supplier,	
+						"reference_type":"Purchase Invoice",
+						"reference_name":clearance_item.pi_jv_reference								
+					})
+					# credit entry
+					accounts.append({
+						"account": credit_account,
+						"credit_in_account_currency": clearance_item.amount_with_tax,
+						"cost_center": default_cost_center or '',
+						"party_type":"Employee",
+						"party":self.employee,
+						# "reference_type":"Purchase Invoice",
+						# "reference_name":clearance_item.pi_jv_reference
+					})
 		
 		if len(accounts)>0:
 			print('clearance_detail_row_idx',clearance_detail_row_idx)
@@ -577,3 +590,61 @@ class PCClearance(Document):
 		
 		# msg = _('Journal Entry {0} is created.'.format(frappe.bold(get_link_to_form('Journal Entry',journal_entry.name))))   
 		# frappe.msgprint(msg)	
+	def create_je_for_personal_loan(self,default_petty_cash_account):
+		clearance_detail_row_idx_msg=[]
+		accounts = []
+		default_employee_loan_account = frappe.db.get_value("Company",self.company,"default_employee_advance_account")
+		if not default_employee_loan_account:
+			frappe.throw(_("Default Employee Advance Account is not set in Company {0}".format(self.company)))
+		for clearance_item in self.clearance_details:
+			if clearance_item.is_personal_loan==1:
+				clearance_detail_row_idx=clearance_item.idx				
+				debit_amount=flt(clearance_item.amount_with_tax,2)
+
+				credit_account=default_petty_cash_account
+				expense_amount=flt(clearance_item.amount_with_tax,2)   
+				bill_no=clearance_item.bill_no
+				cost_center=clearance_item.cost_center
+				
+				accounts.append({
+					"account": default_employee_loan_account,
+					"debit_in_account_currency": debit_amount,
+					"cost_center": cost_center,
+					"party_type":"Employee",
+					"party":self.employee
+				})          
+				# credit entry
+				accounts.append({
+					"account": credit_account,
+					"credit_in_account_currency": expense_amount,
+					"cost_center":  cost_center,
+					"party_type":"Employee",
+					"party":self.employee
+				})
+				clearance_detail_row_idx_msg.append(clearance_detail_row_idx)
+
+		clearance_detail_row_idx_join_msg = ", ".join((str(ele) if ele!=None else '') for ele in clearance_detail_row_idx_msg)
+		if len(accounts)>0:
+			print('clearance_detail_row_idx',clearance_detail_row_idx)
+			user_remark="This is auto created Personal Loan JV. It is created for PC Clearance {0} child table row no. {1}".format(self.name,clearance_detail_row_idx_join_msg)
+			
+			journal_entry = frappe.new_doc('Journal Entry')
+			journal_entry.voucher_type = 'Journal Entry'
+			journal_entry.company = self.company
+			journal_entry.user_remark =user_remark
+			# todo : journal_entry.bill_no=bill_no
+			journal_entry.posting_date = self.clearance_date
+			journal_entry.set("accounts", accounts)
+			journal_entry.custom_pc_clearance_reference=self.name
+			journal_entry.save(ignore_permissions = True)				
+			journal_entry.submit()	
+			journal_entry.add_comment('Comment', text=user_remark)
+			frappe.msgprint(_("Personal Loan Journal Entry {0} is created for PC Clearance {1}").format(frappe.bold(get_link_to_form('Journal Entry',journal_entry.name)),self.name),alert=True)
+
+			for item in self.clearance_details:
+				for ele in clearance_detail_row_idx_msg:
+					if item.idx==ele:
+						frappe.db.set_value("PC Clearance Detail",item.name,"pi_jv_reference",journal_entry.name)
+			return journal_entry.name
+		else:
+			return None
