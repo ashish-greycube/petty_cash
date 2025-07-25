@@ -611,7 +611,7 @@ class PCClearance(Document):
 					"debit_in_account_currency": debit_amount,
 					"cost_center": cost_center,
 					"party_type":"Employee",
-					"party":self.employee
+					"party":clearance_item.employee
 				})          
 				# credit entry
 				accounts.append({
@@ -619,7 +619,7 @@ class PCClearance(Document):
 					"credit_in_account_currency": expense_amount,
 					"cost_center":  cost_center,
 					"party_type":"Employee",
-					"party":self.employee
+					"party":clearance_item.employee
 				})
 				clearance_detail_row_idx_msg.append(clearance_detail_row_idx)
 

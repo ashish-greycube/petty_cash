@@ -12,6 +12,7 @@
   "expense_date",
   "is_tax_applicable",
   "is_personal_loan",
+  "employee",
   "section_break_luyop",
   "supplier",
   "project",
@@ -180,12 +181,20 @@
    "fieldname": "is_personal_loan",
    "fieldtype": "Check",
    "label": "Is Personal Loan"
+  },
+  {
+   "depends_on": "eval:doc.is_personal_loan==1",
+   "fieldname": "employee",
+   "fieldtype": "Link",
+   "label": "Employee",
+   "mandatory_depends_on": "eval:doc.is_personal_loan==1",
+   "options": "Employee"
   }
  ],
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2025-07-18 07:17:23.804288",
+ "modified": "2025-07-25 09:56:48.985631",
  "modified_by": "Administrator",
  "module": "Petty Cash",
  "name": "PC Clearance Detail",
