@@ -619,7 +619,7 @@ class PCClearance(Document):
 					"credit_in_account_currency": expense_amount,
 					"cost_center":  cost_center,
 					"party_type":"Employee",
-					"party":clearance_item.employee
+					"party":self.employee
 				})
 				clearance_detail_row_idx_msg.append(clearance_detail_row_idx)
 
